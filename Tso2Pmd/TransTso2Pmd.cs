@@ -18,6 +18,17 @@ using TDCGUtils;
 
 namespace Tso2Pmd
 {
+    struct sdef_attr
+    {
+        public List<int> ids;
+        public int bone1;
+        public int bone2;
+        public Vector3 pos1;
+        public Vector3 vec1;
+        public float max_pi;
+        public float min_pi;
+    }
+
     public class TransTso2Pmd
     {
         PmxFile pmd = new PmxFile();
@@ -47,10 +58,6 @@ namespace Tso2Pmd
         // 表情設定リスト
         // -----------------------------------------------------
         Morphing morph = new Morphing();
-      
-        // 表情に関連するBoneの最小、及び最大
-        const int FACE_BONE_MIN = 86;
-        const int FACE_BONE_MAX = 135;
 
         public TransTso2Pmd()
         {
@@ -102,32 +109,62 @@ namespace Tso2Pmd
             PMD_DispGroup disp_group = cortable.boneDispGroups[0];//Root枠
             {
                 PMD_BoneDisp disp = new PMD_BoneDisp();
-                disp.bone_name = "センター";
+                disp.bone_name = "全ての親";
                 disp_group.disps.Add(disp);
             }
 
             // -----------------------------------------------------
             // ボーン情報
             // -----------------------------------------------------
-            pmd.nodes = new PMD_Bone[2];
+            pmd.nodes = new PMD_Bone[5];
 
-            // センター
+            // 全ての親
             pmd.nodes[0] = new PMD_Bone();
-            pmd.nodes[0].name = "センター";
+            pmd.nodes[0].name = "全ての親";
+            pmd.nodes[0].name_en = "root";
             pmd.nodes[0].Kind = 1; // 1:回転と移動
             pmd.nodes[0].ParentName = null;
-            pmd.nodes[0].TailName = "センター先";
+            pmd.nodes[0].TailName = "センター";
             pmd.nodes[0].TargetName = null;
-            pmd.nodes[0].position = new Vector3(0.0f, 5.0f, 0.0f);
+            pmd.nodes[0].position = new Vector3(0.0f, 0.0f, 0.0f);
+
+            // センター
+            pmd.nodes[1] = new PMD_Bone();
+            pmd.nodes[1].name = "センター";
+            pmd.nodes[1].name_en = "center";
+            pmd.nodes[1].Kind = 1; // 1:回転と移動
+            pmd.nodes[1].ParentName = "全ての親";
+            pmd.nodes[1].TailName = "センター先";
+            pmd.nodes[1].TargetName = null;
+            pmd.nodes[1].position = new Vector3(0.0f, 5.0f, 0.0f);
 
             // センター先
-            pmd.nodes[1] = new PMD_Bone();
-            pmd.nodes[1].name = "センター先";
-            pmd.nodes[1].Kind = 7; // 7:非表示
-            pmd.nodes[1].ParentName = "センター";
-            pmd.nodes[1].TailName = null;
-            pmd.nodes[1].TargetName = null;
-            pmd.nodes[1].position = new Vector3(0.0f, 0.0f, 0.0f);
+            pmd.nodes[2] = new PMD_Bone();
+            pmd.nodes[2].name = "センター先";
+            pmd.nodes[2].Kind = 7; // 7:非表示
+            pmd.nodes[2].ParentName = "センター";
+            pmd.nodes[2].TailName = null;
+            pmd.nodes[2].TargetName = null;
+            pmd.nodes[2].position = new Vector3(0.0f, 0.0f, 0.0f);
+
+            // グルーブ
+            pmd.nodes[3].name = "グルーブ";
+            pmd.nodes[3].name_en = "groove";
+            pmd.nodes[3].Kind = 1; // 1:回転と移動
+            pmd.nodes[3] = new PMD_Bone();
+            pmd.nodes[3].ParentName = "センター";
+            pmd.nodes[3].TailName = "グルーブ先";
+            pmd.nodes[3].TargetName = null;
+            pmd.nodes[3].position = new Vector3(0.0f, 5.5f, 0.0f);
+
+            // グルーブ先
+            pmd.nodes[4] = new PMD_Bone();
+            pmd.nodes[4].name = "グルーブ先";
+            pmd.nodes[4].Kind = 7; // 7:非表示
+            pmd.nodes[4].ParentName = "グルーブ";
+            pmd.nodes[4].TailName = null;
+            pmd.nodes[4].TargetName = null;
+            pmd.nodes[4].position = new Vector3(0.0f, 6.5f, 0.0f);
 
             // -----------------------------------------------------
             // 予め、情報をコピーするmeshを選定し、並び替えておく
@@ -190,7 +227,7 @@ namespace Tso2Pmd
             }
  
             // -----------------------------------------------------
-            // ボーン情報
+            // ボーン情報 CSV情報から内部データへコピー
             // -----------------------------------------------------
             List<PMD_Bone> nodes = new List<PMD_Bone>();
 
@@ -200,11 +237,11 @@ namespace Tso2Pmd
                 PMD_Bone pmd_b = new PMD_Bone();
 
                 pmd_b.name = bone.name;
-                pmd_b.name_en = bone.name_en;
                 pmd_b.Kind = bone.Kind;
                 pmd_b.ParentName = bone.ParentName;
                 pmd_b.TailName = bone.TailName;
                 pmd_b.TargetName = bone.TargetName;
+                pmd_b.visible = bone.visible;
 
                 string bone_name = null;
                 cortable.bonePositions.TryGetValue(pmd_b.name, out bone_name);
@@ -248,7 +285,6 @@ namespace Tso2Pmd
             if (mod_type == 0)
             {
                 InitializePMDFaces();
-                MakePMDFaces();
             }
             else
             {
@@ -278,11 +314,16 @@ namespace Tso2Pmd
                 }
             }
 
+            // -----------------------------------------------------
+            // PhysObTemplate CSScript実行
+            // -----------------------------------------------------
             if (mod_type == 0)
             {
                 T2PPhysObjectList physOb_list = new T2PPhysObjectList(nodes);
-
                 template_list.PhysObExecute(ref physOb_list);
+
+                MakePMDFaces(physOb_list);
+                SetSDEF(physOb_list);
 
                 pmd.bodies = physOb_list.bodies.ToArray();
                 pmd.joints = physOb_list.joints.ToArray();
@@ -292,6 +333,7 @@ namespace Tso2Pmd
                 pmd.bodies = new PMD_RBody[0];
                 pmd.joints = new PMD_Joint[0];
             }
+
         }
 
         /// 親子関係を元に並び替える
@@ -321,6 +363,11 @@ namespace Tso2Pmd
         /// </summary>
         void UpdateRootBonePosition()
         {
+            pmd.GetBoneByName("全ての親").position
+                = new Vector3(
+                    0.0f,
+                    0.0f,
+                    0.0f);
             pmd.GetBoneByName("センター").position
                 = new Vector3(
                     0.0f,
@@ -330,6 +377,16 @@ namespace Tso2Pmd
                 = new Vector3(
                     0.0f,
                     0.0f,
+                    0.0f);
+            pmd.GetBoneByName("グルーブ").position
+                = new Vector3(
+                    0.0f,
+                    pmd.GetBoneByName("センター").position.Y + 0.2f,
+                    0.0f);
+            pmd.GetBoneByName("グルーブ先").position
+                = new Vector3(
+                    0.0f,
+                    pmd.GetBoneByName("グルーブ").position.Y + 1.4f,
                     0.0f);
         }
 
@@ -397,9 +454,6 @@ namespace Tso2Pmd
                 number_of_skin += mg.Items.Count;
             pmd.skins = new PMD_Skin[number_of_skin];
 
-            // 表情に関連するboneに影響を受ける頂点を数え上げる
-            int numFaceVertices = CalcNumFaceVertices(fig.Tmo);
-
             // 表情
             foreach (MorphGroup mg in morph.Groups)
             {
@@ -407,7 +461,6 @@ namespace Tso2Pmd
                 {
                     pmd.skins[skin_idx] = new PMD_Skin();
                     pmd.skins[skin_idx].name = m.Name;
-                    pmd.skins[skin_idx].vertices = new PMD_SkinVertex[numFaceVertices];
 
                     switch (mg.Name)
                     {
@@ -443,16 +496,27 @@ namespace Tso2Pmd
             foreach (TSOFile tso in fig.TSOList)
             {
                 for (int script_num = 0; script_num < tso.sub_scripts.Length; script_num++)
-                foreach (TSOMesh mesh in tso.meshes)
-                foreach (TSOSubMesh sub_mesh in mesh.sub_meshes)
-                {
-                    if (sub_mesh.spec == script_num)
-                    if (use_meshes[sub_mesh_num++] == true)
-                    {
-                        meshes.Add(sub_mesh);
-                        material_list.Add(tso_num, script_num, UseEdge, tso.FileName);
+                    foreach (TSOMesh mesh in tso.meshes) {
+
+                        int sub_mesh_idx = 0;
+                        foreach (TSOSubMesh sub_mesh in mesh.sub_meshes)
+                        {
+                            if (sub_mesh.spec == script_num)
+                                if (use_meshes[sub_mesh_num++] == true)
+                                {
+                                    meshes.Add(sub_mesh);
+                                    if (UniqueMaterial)
+                                        material_list.Add(tso_num, script_num, UseEdge, tso.FileName, "");
+                                    else if (mesh.sub_meshes.Count() > 1)
+                                        material_list.Add(tso_num, script_num, UseEdge, tso.FileName,
+                                                "(" + mesh.Name + "-" + sub_mesh_idx.ToString() + ")");
+                                    else
+                                        material_list.Add(tso_num, script_num, UseEdge, tso.FileName,
+                                                "(" + mesh.Name + ")");
+                                }
+                            sub_mesh_idx++;
+                        }
                     }
-                }
                 tso_num++;
             }
         }
@@ -590,10 +654,10 @@ namespace Tso2Pmd
 
                     // -----------------------------------------------------
                     // 頂点インデックス
-
+                    // 
                     // 過去３つまでのインデックスを記憶しておく
                     a = b; b = c; c = idx;
-
+                    
                     // 隣合うインデックスが参照する頂点位置の重複を判定し、
                     // 重複している場合はインデックスの追加を省略する
                     if ((n_inMesh >= 2) &&
@@ -635,53 +699,18 @@ namespace Tso2Pmd
             pmd.materials = material_list.materials.ToArray();
         }
 
-        // 表情に関連するboneに影響を受ける頂点を数え上げる
-        private int CalcNumFaceVertices(TMOFile tmo)
-        {
-            int n_vertex = 0; // 表情の頂点の番号（通し番号）
-            int n_inList = -1; // list中のvertexの番号（処理の前に++するために、初期値は0でなく-1としている)
-            foreach (TSOSubMesh sub_mesh in meshes)
-            {
-                int n_inMesh = -1; // mesh中のvertexの番号（処理の前に++するために、初期値は0でなく-1としている)
-                foreach (Vertex vertex in sub_mesh.vertices)
-                {
-                    n_inList++; // list中のvertexの番号を一つ増やす
-                    n_inMesh++; // mesh中のvertexの番号を一つ増やす
-                    int idx = inList_indices[n_inList];
-
-                    if (idx == -1)
-                        continue;
-
-                    PMD_Vertex pmd_v = pmd.vertices[idx];
-
-                    // -----------------------------------------------------
-                    // 表情情報
-
-                    // 表情に関連するboneに影響を受ける頂点であれば、情報を記憶する
-                    foreach (SkinWeight skin_w in vertex.skin_weights)
-                    {
-                        // 表情に関連するboneに影響を受ける頂点であれば、表情用の頂点とする
-                        if (FACE_BONE_MIN <= sub_mesh.bone_indices[skin_w.bone_index]
-                            && sub_mesh.bone_indices[skin_w.bone_index] <= FACE_BONE_MAX)
-                        {
-                            n_vertex++;
-                            break;
-                        }
-                    }
-                }
-            }
-            return n_vertex;
-        }
-
         // 表情モーフを設定
-        private void MakePMDFaces()
+        private void MakePMDFaces(T2PPhysObjectList physOb_list)
         {
-            int n_vertex = 0; // 表情の頂点の番号（通し番号）
             int n_inList = -1; // list中のvertexの番号（処理の前に++するために、初期値は0でなく-1としている)
             // -----------------------------------------------------
             // 表情情報
             // -----------------------------------------------------
             List<Vector3[]> verPos_face = new List<Vector3[]>();
+            List<List<PMD_SkinVertex>> verSkin_face = new List<List<PMD_SkinVertex>>();
+
+            for (int i = 0; i < pmd.skins.Length; i++)
+                verSkin_face.Add(new List<PMD_SkinVertex>());
 
             foreach (TSOSubMesh sub_mesh in meshes)
             {
@@ -741,33 +770,174 @@ namespace Tso2Pmd
                         continue;
 
                     PMD_Vertex pmd_v = pmd.vertices[idx];
-
-                    // 表情に関連するboneに影響を受ける頂点であれば、情報を記憶する
-                    foreach (SkinWeight skin_w in vertex.skin_weights)
+                    for (int i = 0; i < pmd.skins.Length; i++)
                     {
-                        // 表情に関連するboneに影響を受ける頂点であれば、表情用の頂点とする
-                        if (FACE_BONE_MIN <= sub_mesh.bone_indices[skin_w.bone_index]
-                            && sub_mesh.bone_indices[skin_w.bone_index] <= FACE_BONE_MAX)
-                        {
-                            // 表情の頂点情報
-                            for (int i = 0; i < pmd.skins.Length; i++)
-                            {
-                                pmd.skins[i].vertices[n_vertex] = new PMD_SkinVertex();
+                        if (!physOb_list.morph_limit(sub_mesh, vertex, pmd.skins[i].name))
+                            continue;
+                        PMD_SkinVertex morph_vertex = new PMD_SkinVertex();
+                        // 表情用の頂点の番号
+                        morph_vertex.vertex_id = idx;
 
-                                // 表情用の頂点の番号
-                                pmd.skins[i].vertices[n_vertex].vertex_id = idx;
+                        // 相対位置で指定
+                        Vector3 pmd_face_pos = Trans.CopyPos(verPos_face[i][n_inMesh]);
+                        morph_vertex.position = pmd_face_pos - pmd_v.position;
 
-                                // 相対位置で指定
-                                Vector3 pmd_face_pos = Trans.CopyPos(verPos_face[i][n_inMesh]);
-                                pmd.skins[i].vertices[n_vertex].position = pmd_face_pos - pmd_v.position;
-                            }
-
-                            n_vertex++;
-                            break;
-                        }
+                        if (morph_vertex.position != Vector3.Empty)
+                            verSkin_face[i].Add(morph_vertex);
                     }
-
                 }
+            }
+            for (int i = 0; i < pmd.skins.Length; i++)
+                pmd.skins[i].vertices = verSkin_face[i].ToArray();
+        }
+        
+        public void SetSDEF(T2PPhysObjectList physOb_list)
+        {
+            HashSet<int> sdef_bones = new HashSet<int>();
+            HashSet<int> sdef_bones_disable = new HashSet<int>();
+            for (int i=0; i< pmd.nodes.Length; i++)
+            {
+                if (pmd.nodes[i].disable_sdef)
+                {
+                    sdef_bones_disable.Add(i);
+                }
+                else if (pmd.nodes[i].enable_sdef)
+                {
+                    sdef_bones.Add(i);
+                }
+            }
+
+            Dictionary<string, sdef_attr> sdef_map = new Dictionary<string, sdef_attr>();
+            for (int i = 0; i < pmd.vertices.Length; i++)
+            {
+                // 前処理
+                {
+                    Dictionary<short, float> weights = new Dictionary<short, float>();
+                    for (int j = 0; j < 4; j++)
+                    { // 統合
+                        if (weights.ContainsKey(pmd.vertices[i].skin_weights[j].bone_index))
+                            weights[pmd.vertices[i].skin_weights[j].bone_index] += pmd.vertices[i].skin_weights[j].weight;
+                        else
+                            weights.Add(pmd.vertices[i].skin_weights[j].bone_index, pmd.vertices[i].skin_weights[j].weight);
+                    }
+                    int idx = 0;
+                    foreach (short bone_index in weights.Keys)
+                    { // 再設定
+                        pmd.vertices[i].skin_weights[idx].bone_index = bone_index;
+                        pmd.vertices[i].skin_weights[idx].weight = weights[bone_index];
+                        idx++;
+                    }
+                    for (int j = idx; j < 4; j++)
+                    { // 0埋め
+                        pmd.vertices[i].skin_weights[j].weight = 0.0f;
+                    }
+                }
+                Array.Sort(pmd.vertices[i].skin_weights, (x, y) => PMD_Vertex.CompareSkinWeight(x, y));
+                for (int j = 1; j < 4; j++)
+                {　// 0で埋めたボーンID修正
+                    if (pmd.vertices[i].skin_weights[j].weight == 0.0f)
+                    {
+                        pmd.vertices[i].skin_weights[j].bone_index = pmd.vertices[i].skin_weights[j - 1].bone_index;
+                    }
+                }
+
+                if (pmd.vertices[i].GetActiveBoneNum() == 2) // SDEFで適応できるボーンは2つまで
+                {
+                    int bone1 = pmd.vertices[i].skin_weights[0].bone_index;
+                    int bone2 = pmd.vertices[i].skin_weights[1].bone_index;
+
+                    // SDEF 対象ボーン判定
+                    if ((sdef_bones.Contains(bone1) || sdef_bones.Contains(bone2)) &&
+                        !sdef_bones_disable.Contains(bone1) && !sdef_bones_disable.Contains(bone2))
+                    {
+                        pmd.vertices[i].is_sdef = true;
+                        if (bone1 > bone2)
+                        {
+                            int t = bone1;
+                            bone1 = bone2;
+                            bone2 = t;
+                        }
+                        // C値算出
+                        Vector3 sdef_c;
+                        string sdef_key = bone1.ToString() + "+" + bone2.ToString();
+                        if (!sdef_map.ContainsKey(sdef_key))
+                        {
+                            Vector3 pos1 = pmd.nodes[bone1].position;
+                            Vector3 vec1 = Vector3.Normalize(pmd.nodes[bone2].position - pos1);
+                            float dist_pos1_pi = Vector3.Dot(vec1, pmd.vertices[i].position - pos1);
+                            sdef_map.Add(sdef_key, new sdef_attr()
+                            {
+                                ids = new List<int> { i },
+                                bone1 = bone1,
+                                bone2 = bone2,
+                                pos1 = pos1,
+                                vec1 = vec1,
+                                max_pi = dist_pos1_pi,
+                                min_pi = dist_pos1_pi
+                            });
+                            sdef_c = pos1 + (vec1 * dist_pos1_pi);
+                        }
+                        else
+                        { // R値の最大値、最小値を算出
+                            sdef_attr sdef_data = sdef_map[sdef_key];
+                            float dist_pos1_pi = Vector3.Dot(sdef_data.vec1, pmd.vertices[i].position - sdef_data.pos1);
+                            sdef_c = sdef_data.pos1 + (sdef_data.vec1 * dist_pos1_pi);
+                            sdef_data.ids.Add(i);
+                            if (sdef_data.max_pi < dist_pos1_pi)
+                                sdef_data.max_pi = dist_pos1_pi;
+                            if (sdef_data.min_pi > dist_pos1_pi)
+                                sdef_data.min_pi = dist_pos1_pi;
+                            sdef_map[sdef_key] = sdef_data;
+                        }
+                        pmd.vertices[i].sdef_c = sdef_c;
+                    }
+                    else
+                    { // SDEFの仕様から外れる頂点はフラグoff
+                        pmd.vertices[i].is_sdef = false;
+                    }
+                }
+            }
+            // 算出されたR値を対象頂点に適応
+            foreach(sdef_attr sdef_data in sdef_map.Values)
+            {
+                Console.Write("SDef:{0}-{1} : {2}/{3}\n",
+                    pmd.nodes[sdef_data.bone1].name, pmd.nodes[sdef_data.bone2].name, sdef_data.min_pi, sdef_data.max_pi);
+
+                float diff_pi = sdef_data.max_pi - sdef_data.min_pi;
+                foreach (int i in sdef_data.ids)
+                {
+                    // 影響半径の設定を行う
+                    pmd.vertices[i].sdef_r0 = sdef_data.pos1 + (sdef_data.vec1 * (sdef_data.min_pi + (diff_pi * 0.49f))); 
+                    pmd.vertices[i].sdef_r1 = sdef_data.pos1 + (sdef_data.vec1 * (sdef_data.min_pi + (diff_pi * 0.51f)));
+                }
+                /*
+                PMD_Joint joint = new PMD_Joint();
+                joint.name = "SDefMin_" + pmd.nodes[sdef_data.bone1].name + "-" + pmd.nodes[sdef_data.bone2].name;
+                joint.rbody_a_id = 1;
+                joint.rbody_b_id = 1;
+                joint.position = sdef_data.pos1 + (sdef_data.vec1 * sdef_data.min_pi);
+                joint.rotation = Vector3.Empty;
+                joint.position_min = Vector3.Empty;
+                joint.position_max = Vector3.Empty;
+                joint.rotation_min = Vector3.Empty;
+                joint.rotation_max = Vector3.Empty;
+                joint.spring_position = Vector3.Empty;
+                joint.spring_rotation = Vector3.Empty;
+                physOb_list.joints.Add(joint);
+                joint = new PMD_Joint();
+                joint.name = "SDefMax" + pmd.nodes[sdef_data.bone1].name + "-" + pmd.nodes[sdef_data.bone2].name;
+                joint.rbody_a_id = 1;
+                joint.rbody_b_id = 1;
+                joint.position = sdef_data.pos1 + (sdef_data.vec1 * ((sdef_data.max_pi + sdef_data.min_pi) / 2.0f));
+                joint.rotation = Vector3.Empty;
+                joint.position_min = Vector3.Empty;
+                joint.position_max = Vector3.Empty;
+                joint.rotation_min = Vector3.Empty;
+                joint.rotation_max = Vector3.Empty;
+                joint.spring_position = Vector3.Empty;
+                joint.spring_rotation = Vector3.Empty;
+                physOb_list.joints.Add(joint);
+                */
             }
         }
 
@@ -804,7 +974,7 @@ namespace Tso2Pmd
                 {
                     foreach (Morph mi in mg.Items)
                     {
-                        if (mi.Name == "わーい")
+                        if (mi.Name == "にやり")
                         {
                             // 現在のモーフを有効にする
                             mi.Ratio = 1.0f;

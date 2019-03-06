@@ -118,6 +118,7 @@ namespace Tso2Pmd
 
                     //ドロップされたファイルを読み込む
                     viewer.ClearFigureList();
+                    pd.Value = 10;
                     viewer.LoadAnyFile(name, false);
 
                     // フォームより各パラメータを得て、設定

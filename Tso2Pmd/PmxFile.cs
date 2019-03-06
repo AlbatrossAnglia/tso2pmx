@@ -166,9 +166,9 @@ namespace Tso2Pmd
             bw.Write((byte)1); //剛体Indexサイズ
 
             bw.WritePString(name);
-            bw.WritePString("name en");
+            bw.WritePString("name");
             bw.WritePString(comment);
-            bw.WritePString("comment en");
+            bw.WritePString("comment");
         }
     }
 
@@ -200,16 +200,46 @@ namespace Tso2Pmd
         public float u;
         public float v;
         public PMD_SkinWeight[] skin_weights;
+        public bool is_sdef;
+        public Vector3 sdef_c;
+        public Vector3 sdef_r0;
+        public Vector3 sdef_r1;
         public float edge_scale;
+
+        public static int CompareSkinWeight(PMD_SkinWeight x, PMD_SkinWeight y)
+        {
+            if (x.weight < y.weight)
+                return 1;
+            else if (x.weight > y.weight)
+                return -1;
+            else
+                return 0;
+        }
 
         public PMD_Vertex()
         {
+            is_sdef = false;
             skin_weights = new PMD_SkinWeight[4];
             for (int i = 0; i < 4; i++)
             {
                 skin_weights[i] = new PMD_SkinWeight(0, 0.0f);
             }
             edge_scale = 1.0f;
+        }
+
+        public int GetActiveBoneNum()
+        {
+            int ret = 0;
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (skin_weights[i].weight > 0.0f)
+                {
+                    ret++;
+                }
+            }
+
+            return ret;
         }
 
         /// <summary>
@@ -221,14 +251,33 @@ namespace Tso2Pmd
             bw.Write(ref normal);
             bw.Write(u);
             bw.Write(v);
-            bw.Write((byte)2);//ウェイト変形方式 0:BDEF1 1:BDEF2 2:BDEF4 3:SDEF
-            for (int i = 0; i < 4; i++)
+            
+            if (is_sdef)
             {
-                bw.Write(skin_weights[i].bone_index);
+                bw.Write((byte)3);//ウェイト変形方式 0:BDEF1 1:BDEF2 2:BDEF4 3:SDEF
+                for (int i = 0; i < 2; i++)
+                {
+                    bw.Write(skin_weights[i].bone_index);
+                }
+                for (int i = 0; i < 1; i++)
+                {
+                    bw.Write(skin_weights[i].weight);
+                }
+                bw.Write(ref sdef_c);
+                bw.Write(ref sdef_r0);
+                bw.Write(ref sdef_r1);
             }
-            for (int i = 0; i < 4; i++)
+            else
             {
-                bw.Write(skin_weights[i].weight);
+                bw.Write((byte)2);//ウェイト変形方式 0:BDEF1 1:BDEF2 2:BDEF4 3:SDEF
+                for (int i = 0; i < 4; i++)
+                {
+                    bw.Write(skin_weights[i].bone_index);
+                }
+                for (int i = 0; i < 4; i++)
+                {
+                    bw.Write(skin_weights[i].weight);
+                }
             }
             bw.Write(edge_scale);
         }
@@ -278,15 +327,14 @@ namespace Tso2Pmd
 
         public PMD_Material()
         {
-            name = "material ja";
-            name_en = "material en";
-            diffuse = new Vector4(0.800f, 0.712f, 0.624f, 1.0f);
-            specular = new Vector4(0.150f, 0.150f, 0.150f, 6.0f);
-            ambient = new Vector3(0.500f, 0.445f, 0.390f);
-            flags = Flags.selfshadowmap | Flags.selfshadow;
-            edge_color = new Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-            edge_width = 0.1f;
-
+            name = "";
+            name_en = "material";
+            diffuse = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+            specular = new Vector4(0.0f, 0.0f, 0.0f, 5.0f);
+            ambient = new Vector3(0.5f, 0.5f, 0.5f);
+            flags = Flags.none;
+            edge_color = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+            edge_width = 0.0f;
             memo = "memo";
         }
 
@@ -362,30 +410,47 @@ namespace Tso2Pmd
          0x2000  : 外部親変形
         */
 
-        byte flags_hi;
-        byte flags_lo;
+        public byte flags_hi;
+        public byte flags_lo;
         public short tail_node_id;
         public short target_node_id;
+        public float rotate_ext;
+        public bool visible;
         public Vector3 axis = Vector3.Empty;
+        public Vector3 local_axis_x = Vector3.Empty;
+        public Vector3 local_axis_z = Vector3.Empty;
 
         public PMD_IK IK { get; set; }
+        public Vector3 ik_angle_min = Vector3.Empty;
+        public Vector3 ik_angle_max = Vector3.Empty;
+        
+        public bool enable_sdef;
+        public bool disable_sdef;
 
         public PMD_Bone()
         {
-            name = "node ja";
-            name_en = "node en";
+            name = "";
+            name_en = "node";
             position = new Vector3(0, 5, 0);
             parent_node_id = -1;
-            calc_order = 0;//変形階層
+            calc_order = 0; //変形階層
             kind = 0;
             flags_hi = (byte)0x00;//上位フラグ
             flags_lo = (byte)0x1B;//下位フラグ 0x01: 接続先 1:ボーンで指定
             tail_node_id = -1;
+            rotate_ext = 1.0f;
+            visible = true;
             IK = null;
         }
 
         public void Write(BinaryWriter bw)
         {
+            //非表示
+            if (!visible)
+            {
+                flags_lo = (byte)(flags_lo & ~(0x08));
+            }
+
             bw.WritePString(name);
             bw.WritePString(name_en);
             bw.Write(ref position);
@@ -396,15 +461,21 @@ namespace Tso2Pmd
             bw.Write(tail_node_id);
 
             //回転付与
-            if (flags_hi == 0x01)
+            if ((byte)0x01 <= (flags_hi & (byte)0x01))
             {
                 bw.Write(target_node_id);
-                bw.Write(1.0f);
+                bw.Write(rotate_ext);
             }
             //軸固定
-            if (flags_hi == 0x04)
+            if ((byte)0x01 <= (flags_hi & (byte)0x04))
             {
                 bw.Write(ref axis);
+            }
+            //ローカル軸
+            if ((byte)0x01 <= (flags_hi & (byte)0x08))
+            {
+                bw.Write(ref local_axis_x);
+                bw.Write(ref local_axis_z);
             }
             //IK
             if (IK != null)
@@ -424,12 +495,10 @@ namespace Tso2Pmd
                 switch (kind)
                 {
                     case 0:
-                        calc_order = 0;
                         flags_hi = (byte)0x00;
                         flags_lo = (byte)0x1B;
                         break;
                     case 1:
-                        calc_order = 0;
                         flags_hi = (byte)0x00;
                         flags_lo = (byte)0x1F;
                         break;
@@ -439,39 +508,66 @@ namespace Tso2Pmd
                         flags_lo = (byte)0x3F;
                         break;
                     case 4:
-                        calc_order = 0;
-                        flags_hi = (byte)0x00;
+                        flags_hi = (byte)0x00; 
                         flags_lo = (byte)0x1B;
                         break;
                     case 5:
-                        calc_order = 2;
+                        calc_order = 1;
+                        rotate_ext = 1.0f;
                         flags_hi = (byte)0x01;
                         flags_lo = (byte)0x1B;
                         break;
                     case 6:
-                        calc_order = 0;
                         flags_hi = (byte)0x00;
                         flags_lo = (byte)0x13;
                         break;
                     case 7:
-                        calc_order = 0;
                         flags_hi = (byte)0x00;
                         flags_lo = (byte)0x11;
                         break;
                     case 8:
-                        calc_order = 0;
                         flags_hi = (byte)0x04;
                         flags_lo = (byte)0x1B;
                         break;
                     case 9:
-                        calc_order = 0;
+                        rotate_ext = 1.0f;
                         flags_hi = (byte)0x01;
                         flags_lo = (byte)0x1B;
                         break;
-                    default:
-                        calc_order = 0;
-                        flags_hi = (byte)0x00;
+                    case 100: // 回転, ローカル軸設定
+                        flags_hi = (byte)0x08;
                         flags_lo = (byte)0x1B;
+                        break;
+                    case 101: // 回転と移動, ローカル軸設定
+                        flags_hi = (byte)0x08;
+                        flags_lo = (byte)0x1F;
+                        break;
+                    case 109: // 回転連動(非表示) ※キャンセルボーン用
+                        rotate_ext = -1.0f;
+                        flags_hi = (byte)0x01;
+                        flags_lo = (byte)0x13;
+                        break;
+                    case 110: // 回転 ※足D用
+                        calc_order = 0;
+                        flags_hi = (byte)0x10;
+                        flags_lo = (byte)0x1B;
+                        break;
+                    case 111: // 回転と移動 ※足D用
+                        calc_order = 0;
+                        flags_hi = (byte)0x10;
+                        flags_lo = (byte)0x1F;
+                        break;
+                    case 112: // IK ※足D用
+                        calc_order = 0;
+                        flags_hi = (byte)0x10;
+                        flags_lo = (byte)0x3F;
+                        break;
+                    case 119: // 回転連動(物理後変形) ※足D用
+                        rotate_ext = 1.0f;
+                        flags_hi = (byte)0x11;
+                        flags_lo = (byte)0x1B;
+                        break;
+                    default:
                         break;
                 }
             }
@@ -495,11 +591,34 @@ namespace Tso2Pmd
 
             if (parent_node_id != -1)
             {
-                // 親が捩りボーンなら軸固定を設定する
                 PMD_Bone parent = pmd.nodes[parent_node_id];
-                if (parent.flags_hi == 0x04)
+
+                // 親の変形階層をひきつぐ
+                flags_hi = (byte)(flags_hi | (parent.flags_hi & (byte)0x10));
+                
+                // 親が捩りボーンなら親に軸固定を設定する
+                if ((byte)0x01 <= (parent.flags_hi & (byte)0x04))
                 {
                     parent.axis = Vector3.Normalize(position - parent.position);
+                }
+            } else if (target_node_id != -1)
+            {
+                // もし親子関係にない場合も捩りボーンなら軸固定を設定する
+                PMD_Bone target = pmd.nodes[target_node_id];
+                if ((byte)0x01 <= (flags_hi & (byte)0x04))
+                {
+                    axis = Vector3.Normalize(target.position - position);
+                }
+
+            }
+            if (tail_node_id != -1)
+            {
+                //子ボーンからローカル軸を設定
+                if ((byte)0x01 <= (flags_hi & (byte)0x08))
+                {
+                    Vector3 x = pmd.nodes[tail_node_id].position - position;
+                    local_axis_x = Vector3.Multiply(x, 1 / Vector3.Length(x));
+                    local_axis_z = new Vector3(0.0f, 0.0f, 1.0f);
                 }
             }
         }
@@ -549,8 +668,13 @@ namespace Tso2Pmd
                 PMD_IKNode link = new PMD_IKNode();
 
                 link.node_id = pmd.GetBoneIDByName(node_name);
-                
-                if (node_name == "左ひざ" || node_name == "右ひざ")
+                PMD_Bone link_node = pmd.nodes[link.node_id];
+                if(link_node.ik_angle_max != Vector3.Empty || link_node.ik_angle_min != Vector3.Empty)
+                {
+                    link.constrain_angle = true;
+                    link.angle_min = link_node.ik_angle_min;
+                    link.angle_max = link_node.ik_angle_max;
+                } else if (node_name == "左ひざ" || node_name == "右ひざ")
                 {
                     link.constrain_angle = true;
                     link.angle_min.X = Geometry.DegreeToRadian(-180f);

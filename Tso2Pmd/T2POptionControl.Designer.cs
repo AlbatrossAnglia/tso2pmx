@@ -118,7 +118,7 @@
             this.textBox_Comment.Size = new System.Drawing.Size(290, 99);
             this.textBox_Comment.TabIndex = 11;
             this.textBox_Comment.Text = "PolyMo用モデルデータ : カスタム少女\r\n(物理演算対応モデル)\r\n\r\nモデル編集者 : ---\r\nMOD作成者 : ---\r\nデータ変換 : Tso2Pm" +
-    "x Ver. 0.4.0\r\nCopyright : TechArts3D & ---";
+    "x Ver. 0.5.0\r\nCopyright : TechArts3D & ---";
             // 
             // label7
             // 
@@ -246,8 +246,6 @@
             // cbUseSpheremap
             // 
             this.cbUseSpheremap.AutoSize = true;
-            this.cbUseSpheremap.Checked = true;
-            this.cbUseSpheremap.CheckState = System.Windows.Forms.CheckState.Checked;
             this.cbUseSpheremap.Location = new System.Drawing.Point(22, 142);
             this.cbUseSpheremap.Name = "cbUseSpheremap";
             this.cbUseSpheremap.Size = new System.Drawing.Size(301, 16);
@@ -258,8 +256,6 @@
             // cbUniqueMaterial
             // 
             this.cbUniqueMaterial.AutoSize = true;
-            this.cbUniqueMaterial.Checked = true;
-            this.cbUniqueMaterial.CheckState = System.Windows.Forms.CheckState.Checked;
             this.cbUniqueMaterial.Location = new System.Drawing.Point(22, 186);
             this.cbUniqueMaterial.Name = "cbUniqueMaterial";
             this.cbUniqueMaterial.Size = new System.Drawing.Size(236, 16);

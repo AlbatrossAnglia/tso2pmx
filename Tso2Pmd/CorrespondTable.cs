@@ -114,11 +114,13 @@ namespace Tso2Pmd
                     pmd_b.TailName = (tail_name != "") ? tail_name : null;
                     pmd_b.TargetName = (target_name != "") ? target_name : null;
 
-                    // すでにpmd_b.nameが存在するなら上書き
-                    boneStructure[pmd_b.name] = pmd_b;
-
                     if (disp_name != "")
                         AddBoneNameInDisp(bone_name, disp_name);
+                    else
+                        pmd_b.visible = false;
+
+                    // すでにpmd_b.nameが存在するなら上書き
+                    boneStructure[pmd_b.name] = pmd_b;
                 }
             }
         }

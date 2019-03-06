@@ -16,9 +16,21 @@ namespace Tso2Pmd
         public List<PMD_RBody> bodies = new List<PMD_RBody>();
         public List<PMD_Joint> joints = new List<PMD_Joint>();
 
+        public delegate bool MorphLimit(TSOSubMesh sub_mesh, Vertex vertex, string name);
+        public MorphLimit morph_limit = null;
+
         public T2PPhysObjectList(List<PMD_Bone> nodes)
         {
             this.nodes = nodes;
+            this.morph_limit = delegate (TSOSubMesh sub_mesh, Vertex vertex, string name) {
+                const int FACE_BONE_MIN = 86;
+                const int FACE_BONE_MAX = 149;
+
+                foreach (SkinWeight skin_w in vertex.skin_weights)
+                    if (FACE_BONE_MIN <= sub_mesh.bone_indices[skin_w.bone_index]
+                        && sub_mesh.bone_indices[skin_w.bone_index] <= FACE_BONE_MAX) return true;
+                return false;
+            };
         }
 
         // 名前からボーンIDを得る

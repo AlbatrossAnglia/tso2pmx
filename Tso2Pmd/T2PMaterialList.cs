@@ -63,23 +63,23 @@ namespace Tso2Pmd
         // 頂点インデックス数は後で設定する
         public void Add(int tso_num, int script_num, bool use_edge)
         {
-            Add(tso_num, script_num, use_edge, "memo");
+            Add(tso_num, script_num, use_edge, "none", "");
         }
 
         // TSOSubScriptを元にPMD_Materialを生成して追加する
         // 頂点インデックス数は後で設定する
-        public void Add(int tso_num, int script_num, bool use_edge, string memo)
+        public void Add(int tso_num, int script_num, bool use_edge, string memo, string desc)
         {
             PMD_Material pmd_m = new PMD_Material();
 
-            pmd_m.name = categories[tso_num] + " " + tsos[tso_num].sub_scripts[script_num].Name;
+            pmd_m.name = categories[tso_num] + " " + tsos[tso_num].sub_scripts[script_num].Name + desc;
 
             // スクリプトよりシェーダパラメータを取得
             Shader shader = new Shader();
             shader.Load(tsos[tso_num].sub_scripts[script_num].lines);
 
             pmd_m.diffuse = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-            pmd_m.specular = new Vector4(0.15f, 0.15f, 0.15f, 6.0f);
+            pmd_m.specular = new Vector4(0.0f, 0.0f, 0.0f, 5.0f);
             pmd_m.ambient = new Vector3(0.5f, 0.5f, 0.5f);
 /*
             pmd_m.UseEdge = use_edge;
@@ -98,8 +98,17 @@ namespace Tso2Pmd
                     if (pmd_m.edge_width < 0F) pmd_m.edge_width = 0F;
                     if (pmd_m.edge_width > 1F) pmd_m.edge_width = 1F;
                 }
+                // 両面描画(BothSide)を設定する。
+                if (pm.Name == "technique")
+                {
+                    string technique = pm.GetValueString();
+                    if (technique.Contains("BothSide"))
+                    {
+                        pmd_m.flags = pmd_m.flags | PMD_Material.Flags.both;
+                    }
+                }
                 // エッジが出るtechniqueのみエッジをつける.
-                if(use_edge)
+                if (use_edge)
                     if (pm.Name == "technique")
                     {
                         // dictionaryを見て該当するならエッジをつける

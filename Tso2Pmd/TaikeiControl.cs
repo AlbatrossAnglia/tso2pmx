@@ -67,6 +67,7 @@ namespace Tso2Pmd
             pro_ratio["TDCG.Proportion.AAA_PMDInitPoseM"] = 1.0f;
 
             SetupTPOListRatio();
+
             if (listBox1.SelectedIndex < 0) listBox1.SelectedIndex = 0;
             trackBar1.Value = (int)(pro_ratio[listBox1.SelectedItem.ToString()] * 20.0f);
         }
